@@ -300,3 +300,33 @@ func TestConfigMap_Time(t *testing.T) {
 		t.Error("time should match")
 	}
 }
+
+func TestConfigMap_IntList(t *testing.T) {
+	c := ConfigMap{
+		"list": "1,2,3",
+	}
+
+	if !reflect.DeepEqual(c.IntList("list", ",", []int{}), []int{1, 2, 3}) {
+		t.Error("list should be equal")
+	}
+}
+
+func TestConfigMap_UintList(t *testing.T) {
+	c := ConfigMap{
+		"list": "1,2,3",
+	}
+
+	if !reflect.DeepEqual(c.UintList("list", ",", []uint{}), []uint{1, 2, 3}) {
+		t.Error("list should be equal")
+	}
+}
+
+func TestConfigMap_Float32List(t *testing.T) {
+	c := ConfigMap{
+		"list": "1.1,2.2,3.3",
+	}
+
+	if !reflect.DeepEqual(c.Float32List("list", ",", []float32{}), []float32{1.1, 2.2, 3.3}) {
+		t.Error("list should be equal")
+	}
+}
