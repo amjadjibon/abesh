@@ -3,7 +3,6 @@ package cmd
 import "github.com/mkawserm/abesh/constant"
 
 type Project struct {
-
 }
 
 func (p *Project) Name() string {

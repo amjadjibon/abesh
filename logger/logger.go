@@ -1,11 +1,13 @@
 package logger
 
 import (
-	"github.com/mkawserm/abesh/conf"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"strings"
 	"sync"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
+	"github.com/mkawserm/abesh/conf"
 )
 
 var (
@@ -21,8 +23,8 @@ func (l *SugaredLogger) Warningf(format string, args ...interface{}) {
 	l.Warnf(format, args...)
 }
 
-//func (l *SugaredLogger) SetLevel(_ logger.LogLevel) {
-//}
+// func (l *SugaredLogger) SetLevel(_ logger.LogLevel) {
+// }
 
 type Factory struct {
 	mMutex       sync.Mutex
@@ -37,7 +39,7 @@ type Factory struct {
 
 func (l *Factory) ChangeLogLevel(level string) {
 	level = strings.TrimSpace(level)
-	//fmt.Printf("'%s'",level)
+	// fmt.Printf("'%s'",level)
 	if level == "debug" {
 		l.mZapConfig.Level.SetLevel(zap.DebugLevel)
 	} else if level == "info" {
@@ -175,7 +177,7 @@ func newZapConfig() zap.Config {
 	level := strings.TrimSpace(conf.EnvironmentConfigIns().LogLevel)
 	atomicLevel := zap.NewAtomicLevelAt(zap.DebugLevel)
 
-	//fmt.Printf("'%s'",level)
+	// fmt.Printf("'%s'",level)
 	if level == "debug" {
 		atomicLevel = zap.NewAtomicLevelAt(zap.DebugLevel)
 	} else if level == "info" {
