@@ -2,10 +2,21 @@ package echo
 
 import (
 	"context"
+	"math/rand"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/mkawserm/abesh/constant"
 	"github.com/mkawserm/abesh/iface"
 	"github.com/mkawserm/abesh/model"
 	"github.com/mkawserm/abesh/registry"
+)
+
+var RandomNumber = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Name: "random_number",
+		Help: "Random number",
+	},
 )
 
 type Echo struct {
@@ -72,9 +83,15 @@ func (e *Echo) Serve(_ context.Context, input *model.Event) (*model.Event, error
 		outputEvent.Value = []byte("echo")
 	}
 
+	min := -1000
+	max := 1000
+	random := rand.Intn(max-min) + min
+
+	RandomNumber.Set(float64(random))
 	return outputEvent, nil
 }
 
 func init() {
+	prometheus.MustRegister(RandomNumber)
 	registry.GlobalRegistry().AddCapability(&Echo{})
 }

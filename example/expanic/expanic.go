@@ -4,13 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
+
 	"github.com/mkawserm/abesh/constant"
 	"github.com/mkawserm/abesh/iface"
 	"github.com/mkawserm/abesh/logger"
 	"github.com/mkawserm/abesh/model"
 	"github.com/mkawserm/abesh/registry"
 	stack2 "github.com/mkawserm/abesh/stack"
-	"go.uber.org/zap"
+)
+
+var panicCounter = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "abesh_example_err_panic_counter",
+		Help: "Panic Counter",
+	},
+	[]string{"contractid"},
 )
 
 type ExPanic struct {
@@ -61,10 +72,16 @@ func (e *ExPanic) Serve(_ context.Context, input *model.Event) (event *model.Eve
 			// add as much information as possible
 			logger.L(e.ContractId()).Error("panic stack trace",
 				zap.Any("stack", stack2.String(stack)),
+				// zap.Any("panic", string(debug.Stack())),
 				zap.String("path", input.Metadata.GetPath()),
 				zap.String("method", input.Metadata.GetMethod()),
 				zap.Any("query", input.Metadata.GetQuery()),
 				zap.String("panic_msg", panicMsg))
+
+			go func() {
+				panicCounter.WithLabelValues(e.ContractId()).Inc()
+			}()
+
 			return
 		}
 	}()
@@ -74,5 +91,6 @@ func (e *ExPanic) Serve(_ context.Context, input *model.Event) (event *model.Eve
 }
 
 func init() {
+	prometheus.MustRegister(panicCounter)
 	registry.GlobalRegistry().AddCapability(&ExPanic{})
 }

@@ -5,23 +5,43 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"github.com/mkawserm/abesh/constant"
-	"github.com/mkawserm/abesh/iface"
-	"github.com/mkawserm/abesh/logger"
-	"github.com/mkawserm/abesh/model"
-	"github.com/mkawserm/abesh/registry"
-	"github.com/mkawserm/abesh/utility"
-	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
+
+	"github.com/mkawserm/abesh/constant"
+	"github.com/mkawserm/abesh/iface"
+	"github.com/mkawserm/abesh/logger"
+	"github.com/mkawserm/abesh/model"
+	"github.com/mkawserm/abesh/registry"
+	"github.com/mkawserm/abesh/utility"
 )
 
 var ErrPathNotDefined = errors.New("path not defined")
 var ErrMethodNotDefined = errors.New("method not defined")
+
+var responseStatus = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "abesh_httpserver_response_status",
+		Help: "Status of HTTP Response",
+	},
+	[]string{"path", "status"},
+)
+
+var panicCounter = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "abesh_httpserver_panic_counter",
+		Help: "Abesh HTTP Server Panic Counter",
+	},
+	[]string{"contractid"},
+)
 
 type EventResponse struct {
 	Error error
@@ -57,6 +77,9 @@ type HTTPServer struct {
 	d409m string
 	d499m string
 	d500m string
+
+	mIsMetricsEnabled bool
+	mMetricPath       string
 }
 
 func (h *HTTPServer) Name() string {
@@ -115,6 +138,9 @@ func (h *HTTPServer) SetConfigMap(values model.ConfigMap) error {
 	h.d409m = h.buildDefaultMessage(409)
 	h.d499m = h.buildDefaultMessage(499)
 	h.d500m = h.buildDefaultMessage(500)
+
+	h.mIsMetricsEnabled = h.mValues.Bool("metrics_enabled", false)
+	h.mMetricPath = values.String("metric_path", "/metrics")
 
 	return nil
 }
@@ -218,6 +244,11 @@ func (h *HTTPServer) Setup() error {
 		zap.String("host", h.mHost),
 		zap.String("port", h.mPort))
 
+	if h.mIsMetricsEnabled {
+		h.AddHandler(h.mMetricPath, promhttp.Handler())
+		logger.L(h.ContractId()).Info("metrics enabled", zap.String("metric_path", h.mMetricPath))
+	}
+
 	return nil
 }
 
@@ -298,30 +329,37 @@ func (h *HTTPServer) writeMessage(statusCode int, defaultMessage string, request
 }
 
 func (h *HTTPServer) s401m(request *http.Request, writer http.ResponseWriter, errLocal error) {
+	responseStatus.WithLabelValues(request.URL.Path, "401").Inc()
 	h.writeMessage(401, h.d401m, request, writer, errLocal)
 }
 
 func (h *HTTPServer) s403m(request *http.Request, writer http.ResponseWriter, errLocal error) {
+	responseStatus.WithLabelValues(request.URL.Path, "403").Inc()
 	h.writeMessage(403, h.d403m, request, writer, errLocal)
 }
 
 func (h *HTTPServer) s404m(request *http.Request, writer http.ResponseWriter, errLocal error) {
+	responseStatus.WithLabelValues(request.URL.Path, "404").Inc()
 	h.writeMessage(404, h.d404m, request, writer, errLocal)
 }
 
 func (h *HTTPServer) s405m(request *http.Request, writer http.ResponseWriter, errLocal error) {
+	responseStatus.WithLabelValues(request.URL.Path, "405").Inc()
 	h.writeMessage(405, h.d405m, request, writer, errLocal)
 }
 
 func (h *HTTPServer) s408m(request *http.Request, writer http.ResponseWriter, errLocal error) {
+	responseStatus.WithLabelValues(request.URL.Path, "408").Inc()
 	h.writeMessage(408, h.d408m, request, writer, errLocal)
 }
 
 func (h *HTTPServer) s499m(request *http.Request, writer http.ResponseWriter, errLocal error) {
+	responseStatus.WithLabelValues(request.URL.Path, "499").Inc()
 	h.writeMessage(499, h.d499m, request, writer, errLocal)
 }
 
 func (h *HTTPServer) s500m(request *http.Request, writer http.ResponseWriter, errLocal error) {
+	responseStatus.WithLabelValues(request.URL.Path, "500").Inc()
 	h.writeMessage(500, h.d500m, request, writer, errLocal)
 }
 
@@ -388,6 +426,10 @@ func (h *HTTPServer) AddService(
 					zap.String("method", request.Method),
 					zap.String("uri", request.RequestURI),
 					zap.String("panic_msg", panicMsg))
+
+				go func() {
+					panicCounter.WithLabelValues(h.ContractId()).Inc()
+				}()
 
 				h.s500m(request, writer, nil)
 				return
@@ -485,13 +527,20 @@ func (h *HTTPServer) AddService(
 				return
 			}
 
+			// NOTE: PROMETHEUS RESPONSE STATISTICS
+			go func() {
+				responseStatus.WithLabelValues(request.URL.Path,
+					fmt.Sprintf("%d", r.Event.Metadata.StatusCode)).Inc()
+			}()
+
 			// transmit output event
 			h.TransmitOutputEvent(service.ContractId(), r.Event)
 
-			//NOTE: handle success from service
+			// NOTE: handle success from service
 			for k, v := range r.Event.Metadata.Headers {
 				writer.Header().Add(k, v)
 			}
+
 			writer.WriteHeader(int(r.Event.Metadata.StatusCode))
 
 			if _, err = writer.Write(r.Event.Value); err != nil {
@@ -509,5 +558,6 @@ func (h *HTTPServer) AddService(
 }
 
 func init() {
+	prometheus.MustRegister(panicCounter, responseStatus)
 	registry.GlobalRegistry().AddCapability(&HTTPServer{})
 }

@@ -3,18 +3,20 @@ package platform
 import (
 	"context"
 	"errors"
+	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
+	"time"
+
+	"go.uber.org/zap"
+
 	"github.com/mkawserm/abesh/conf"
 	"github.com/mkawserm/abesh/constant"
 	"github.com/mkawserm/abesh/iface"
 	"github.com/mkawserm/abesh/logger"
 	"github.com/mkawserm/abesh/model"
 	"github.com/mkawserm/abesh/registry"
-	"go.uber.org/zap"
-	"os"
-	"os/signal"
-	"runtime"
-	"syscall"
-	"time"
 )
 
 var ErrCapabilityNotFound = errors.New("capability is not found in the global registry")
@@ -63,9 +65,9 @@ func (o *One) GetCapabilityRegistry() map[string]iface.ICapability {
 	return o.capabilityRegistry.Iterator()
 }
 
-//func (o *One) GetRPCCapability() map[string]iface.IRPC {
+// func (o *One) GetRPCCapability() map[string]iface.IRPC {
 //	return o.rpcsCapability
-//}
+// }
 
 func (o *One) getConsumers(contractId string) []iface.IConsumer {
 	var ok bool
@@ -295,7 +297,7 @@ func (o *One) configureConsumers(manifest *model.Manifest) error {
 }
 
 func (o *One) configureTriggers(manifest *model.Manifest) error {
-	//Configuring triggers
+	// Configuring triggers
 	for _, s := range manifest.Triggers {
 		trigger := o.triggersCapability[s.Trigger]
 		if trigger == nil {
@@ -507,8 +509,8 @@ func (o *One) Run() {
 
 		logger.L(constant.Name).Info("preparing for shutdown")
 
-		//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		//defer cancel()
+		// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		// defer cancel()
 
 		logger.L(constant.Name).Info("closing all capabilities")
 		for _, c := range o.startCapabilityList {
