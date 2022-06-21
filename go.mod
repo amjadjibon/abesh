@@ -6,7 +6,7 @@ require (
 	github.com/caarlos0/env v3.5.0+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/prometheus/client_golang v1.12.2
-	github.com/spf13/cobra v1.4.0
+	github.com/spf13/cobra v1.5.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/text v0.3.7
 	google.golang.org/protobuf v1.28.0
